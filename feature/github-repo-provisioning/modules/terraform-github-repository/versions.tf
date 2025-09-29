@@ -7,6 +7,7 @@ terraform {
 
   required_providers {
     github = {
+      # FIXME: Required until they mode to public repository
       source  = "github.com/G-Research/github"
       version = "6.5.0-gr"
     }
