@@ -588,3 +588,29 @@ resource "github_app_installation_repository" "app_installation_repository" {
   repository      = github_repository.repository.name
   installation_id = each.value
 }
+
+# ---------------------------------------------------------------------------------------------------------------------
+# CODEOWNERS file
+# ---------------------------------------------------------------------------------------------------------------------
+
+locals {
+  codeowners_content = length(var.codeowners) > 0 ? join("\n", [
+    for rule in var.codeowners :
+    "${rule.path} ${join(" ", rule.owners)}"
+  ]) : null
+}
+
+resource "github_repository_file" "codeowners" {
+  count = local.codeowners_content != null ? 1 : 0
+
+  repository          = github_repository.repository.name
+  branch              = local.default_branch != null ? local.default_branch : github_repository.repository.default_branch
+  file                = ".github/CODEOWNERS"
+  content             = local.codeowners_content
+  commit_message      = "Add CODEOWNERS file"
+  commit_author       = "Terraform"
+  commit_email        = "terraform@example.com"
+  overwrite_on_create = true
+
+  depends_on = [github_repository.repository, github_branch_default.default]
+}

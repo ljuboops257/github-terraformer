@@ -608,3 +608,29 @@ variable "module_depends_on" {
   description = "(Optional) Define resources this module indirectly depends_on."
   default     = []
 }
+
+variable "codeowners" {
+  description = "(Optional) A list of CODEOWNERS rules for the repository."
+  type = list(object({
+    path   = string
+    owners = list(string)
+  }))
+
+  # Example:
+  # codeowners = [
+  #   {
+  #     path   = "*"
+  #     owners = ["@org/team-leads", "@username"]
+  #   },
+  #   {
+  #     path   = "*.js"
+  #     owners = ["@org/frontend-team"]
+  #   },
+  #   {
+  #     path   = "/docs/"
+  #     owners = ["@org/docs-team", "@username"]
+  #   }
+  # ]
+
+  default = []
+}

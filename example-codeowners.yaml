@@ -1,0 +1,25 @@
+repositories:
+  example-org/my-repo:
+    description: "Example repository with CODEOWNERS"
+    visibility: "private"
+    codeowners:
+      - path: "*"
+        owners:
+          - "@example-org/team-leads"
+          - "@admin-user"
+      - path: "*.js"
+        owners:
+          - "@example-org/frontend-team"
+      - path: "*.go"
+        owners:
+          - "@example-org/backend-team"
+      - path: "/docs/"
+        owners:
+          - "@example-org/docs-team"
+          - "@technical-writer"
+      - path: "/terraform/"
+        owners:
+          - "@example-org/devops-team"
+      - path: "*.tf"
+        owners:
+          - "@example-org/devops-team"
