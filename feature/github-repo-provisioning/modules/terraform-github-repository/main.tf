@@ -153,11 +153,11 @@ resource "github_repository" "repository" {
     ]
   }
 
-    squash_merge_commit_title   = local.squash_merge_commit_title
-    squash_merge_commit_message = local.squash_merge_commit_message
-    merge_commit_title          = local.merge_commit_title
-    merge_commit_message        = local.merge_commit_message
-    web_commit_signoff_required = local.web_commit_signoff_required
+  squash_merge_commit_title   = local.squash_merge_commit_title
+  squash_merge_commit_message = local.squash_merge_commit_message
+  merge_commit_title          = local.merge_commit_title
+  merge_commit_message        = local.merge_commit_message
+  web_commit_signoff_required = local.web_commit_signoff_required
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -246,15 +246,15 @@ resource "github_branch_protection" "branch_protection" {
   dynamic "restrict_pushes" {
     for_each = var.branch_protections_v4[each.value].restricts_pushes ? try([var.branch_protections_v4[each.value]], []) : []
     content {
-      blocks_creations  = try(var.branch_protections_v4[each.value].blocks_creations, true)
-      push_allowances   = try(var.branch_protections_v4[each.value].push_restrictions, [])
+      blocks_creations = try(var.branch_protections_v4[each.value].blocks_creations, true)
+      push_allowances  = try(var.branch_protections_v4[each.value].push_restrictions, [])
     }
   }
 
-  force_push_bypassers  = try(var.branch_protections_v4[each.value].force_push_bypassers, [])
-  allows_force_pushes   = try(var.branch_protections_v4[each.value].allows_force_pushes, null)
-  allows_deletions      = try(var.branch_protections_v4[each.value].allows_deletions, null)
-  lock_branch           = try(var.branch_protections_v4[each.value].lock_branch, null)
+  force_push_bypassers = try(var.branch_protections_v4[each.value].force_push_bypassers, [])
+  allows_force_pushes  = try(var.branch_protections_v4[each.value].allows_force_pushes, null)
+  allows_deletions     = try(var.branch_protections_v4[each.value].allows_deletions, null)
+  lock_branch          = try(var.branch_protections_v4[each.value].lock_branch, null)
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -600,6 +600,7 @@ locals {
   ]) : null
 }
 
+# https://registry.terraform.io/providers/integrations/github/latest/docs/resources/repository_file
 resource "github_repository_file" "codeowners" {
   count = local.codeowners_content != null ? 1 : 0
 
@@ -608,8 +609,8 @@ resource "github_repository_file" "codeowners" {
   file                = ".github/CODEOWNERS"
   content             = local.codeowners_content
   commit_message      = "Add CODEOWNERS file"
-  commit_author       = "Terraform"
-  commit_email        = "terraform@example.com"
+  commit_author       = data.github_app.app[bypasser].name
+  commit_email        = data.github_app.app[bypasser].node_id
   overwrite_on_create = true
 
   depends_on = [github_repository.repository, github_branch_default.default]
