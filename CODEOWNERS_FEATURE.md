@@ -69,7 +69,7 @@ repositories:
 
 ## Terraform Module (github-repo-provisioning)
 
-### Variable
+### Variables
 
 ```hcl
 variable "codeowners" {
@@ -79,6 +79,30 @@ variable "codeowners" {
     owners = list(string)
   }))
   default = []
+}
+
+variable "codeowners_commit_author" {
+  description = "(Optional) The commit author for CODEOWNERS file. If not provided, uses the authenticated GitHub app name."
+  type        = string
+  default     = null
+}
+
+variable "codeowners_commit_email" {
+  description = "(Optional) The commit email for CODEOWNERS file. If not provided, uses the authenticated GitHub app email format."
+  type        = string
+  default     = null
+}
+
+variable "auto_add_app_bypass" {
+  description = "(Optional) Automatically add the current GitHub app as a bypasser to branch protections and rulesets."
+  type        = bool
+  default     = true
+}
+
+variable "github_app_slug" {
+  description = "(Optional) The GitHub app slug for data source lookup."
+  type        = string
+  default     = null
 }
 ```
 
@@ -154,10 +178,16 @@ The CODEOWNERS feature supports GitHub's standard path patterns:
 
 ### Terraform Module Changes
 
-1. **New Variable**: Added `codeowners` variable in `variables.tf`
-2. **Resource**: Added `github_repository_file` resource to create the CODEOWNERS file
-3. **Content Generation**: Local value to generate CODEOWNERS file content
-4. **Dependencies**: Proper dependency management with repository and branch creation
+1. **New Variables**: Added `codeowners`, `codeowners_commit_author`, and `codeowners_commit_email` variables in `variables.tf`
+2. **GitHub App Data Source**: Added `data "github_app" "current"` to get authenticated app information
+3. **Resource**: Added `github_repository_file` resource to create the CODEOWNERS file
+4. **Content Generation**: Local value to generate CODEOWNERS file content
+5. **Commit Attribution**: Uses authenticated GitHub app name and email with optional override
+6. **Dependencies**: Proper dependency management with repository and branch creation
+
+### Main Module Integration
+
+Added `codeowners = try(each.value.codeowners, [])` to the module call in the main configuration to pass CODEOWNERS data from YAML to the module.
 
 ### File Placement
 
@@ -184,9 +214,61 @@ For existing repositories:
 2. If a CODEOWNERS file already exists, it will be overwritten
 3. The `overwrite_on_create = true` setting ensures the managed file takes precedence
 
+## Commit Attribution
+
+The CODEOWNERS file commits are attributed using the authenticated GitHub app information:
+
+- **Default Behavior**: Uses `data.github_app.current.name` as commit author and generates an appropriate email
+- **Email Format**: `{app-slug}+{app-id}@users.noreply.github.com` following GitHub's conventions for app-generated commits
+- **Override Options**: Use `codeowners_commit_author` and `codeowners_commit_email` variables to customize
+
+Example with custom attribution:
+```hcl
+module "repository" {
+  # ... other configuration ...
+
+  codeowners_commit_author = "DevOps Bot"
+  codeowners_commit_email  = "devops-bot@company.com"
+}
+```
+
 ## Limitations
 
 1. The implementation creates a single CODEOWNERS file - existing files will be overwritten
 2. The file is placed specifically in `.github/CODEOWNERS` (not at repository root)
 3. The branch used is the default branch of the repository
 4. Manual edits to the CODEOWNERS file will be overwritten on next Terraform apply
+5. Requires GitHub App authentication to access app information for commit attribution
+
+## Auto-Bypass Feature
+
+When `auto_add_app_bypass = true` (default), the current GitHub app is automatically added as a bypasser to:
+
+- **Branch Protections**: Added to `force_push_bypassers` and `pull_request_bypassers`
+- **Repository Rulesets**: Added as a bypass actor with `bypass_mode = "always"`
+
+This ensures the app can commit CODEOWNERS files even when strict branch protection rules or rulesets are in place.
+
+### Configuration Requirements
+
+1. **Main Module**: Add `app_slug` variable to your main module configuration
+2. **Module Call**: The app slug is automatically passed to the repository module
+3. **Data Sources**: Both main and repository modules use `data "github_app"` resources
+
+### Example Usage
+
+```hcl
+# In your terraform.tfvars or variable definitions
+app_slug = "your-github-app-slug"
+
+# The module automatically handles the rest
+module "repository" {
+  source = "./modules/terraform-github-repository"
+
+  # CODEOWNERS configuration
+  codeowners = [...]
+
+  # Auto-bypass is enabled by default
+  auto_add_app_bypass = true  # Optional: can be set to false to disable
+}
+```

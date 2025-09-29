@@ -104,6 +104,11 @@ data "github_app" "app" {
   slug     = split("/", each.value)[1]
 }
 
+# Data source for current authenticated GitHub app for auto-bypass
+data "github_app" "current" {
+  slug = var.app_slug
+}
+
 locals {
   all_generated_collaborators = { for repo, config in local.generated_repos : repo => concat(
     try([for i in config.pull_collaborators : { username : i, permission = "pull" }], []),
@@ -328,6 +333,16 @@ module "repository" {
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   #  app_installations = try(each.value.app_installations, [])
+
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  # CODEOWNERS Configuration
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  codeowners = try(each.value.codeowners, [])
+
+  # Pass through auto-bypass configuration for GitHub app
+  auto_add_app_bypass = true
+  github_app_slug     = var.app_slug
 }
 
 locals {
@@ -401,6 +416,12 @@ locals {
       if startswith(actor.name, "team/")
     ]
   ]))
+
+  # Auto-add current app as bypass actor for CODEOWNERS commits
+  current_app_bypass_actor = {
+    name        = "current-app"
+    bypass_mode = "always"
+  }
 }
 
 data "github_team" "ruleset_team" {
@@ -541,14 +562,21 @@ resource "github_repository_ruleset" "ruleset" {
   }
 
   dynamic "bypass_actors" {
-    for_each = try(each.value.ruleset.bypass_actors, [])
+    for_each = concat(
+      try(each.value.ruleset.bypass_actors, []),
+      [local.current_app_bypass_actor] # Auto-add current app
+    )
 
     content {
-      actor_id = startswith(bypass_actors.value.name, "team/") ? data.github_team.ruleset_team[replace(bypass_actors.value.name, "team/", "")].id : (
-        startswith(bypass_actors.value.name, "app/") ? local.apps_map[bypass_actors.value.name].app_id : local.ruleset_actors[bypass_actors.value.name].actor_id
+      actor_id = bypass_actors.value.name == "current-app" ? data.github_app.current.id : (
+        startswith(bypass_actors.value.name, "team/") ? data.github_team.ruleset_team[replace(bypass_actors.value.name, "team/", "")].id : (
+          startswith(bypass_actors.value.name, "app/") ? local.apps_map[bypass_actors.value.name].app_id : local.ruleset_actors[bypass_actors.value.name].actor_id
+        )
       )
-      actor_type = startswith(bypass_actors.value.name, "team/") ? "Team" : (
-        startswith(bypass_actors.value.name, "app/") ? "Integration" : local.ruleset_actors[bypass_actors.value.name].actor_type
+      actor_type = bypass_actors.value.name == "current-app" ? "Integration" : (
+        startswith(bypass_actors.value.name, "team/") ? "Team" : (
+          startswith(bypass_actors.value.name, "app/") ? "Integration" : local.ruleset_actors[bypass_actors.value.name].actor_type
+        )
       )
       bypass_mode = try(bypass_actors.value.bypass_mode, "always")
     }

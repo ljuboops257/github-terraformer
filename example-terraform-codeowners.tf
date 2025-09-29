@@ -40,4 +40,17 @@ module "example_repository" {
 
   admin_collaborators = ["admin-user"]
   push_teams         = ["example-org/developers"]
+
+  # Optional: Override commit author/email for CODEOWNERS file
+  # If not provided, uses the authenticated GitHub app information
+  # codeowners_commit_author = "Custom Bot"
+  # codeowners_commit_email  = "custom-bot@example.com"
+
+  # Auto-bypass configuration (default: true)
+  # Automatically adds the GitHub app as a bypasser to branch protections
+  # and rulesets to ensure CODEOWNERS commits can be made
+  auto_add_app_bypass = true
+
+  # GitHub app slug (required for data source)
+  github_app_slug = "your-app-slug"
 }
