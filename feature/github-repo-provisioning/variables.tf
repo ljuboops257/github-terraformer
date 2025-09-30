@@ -18,6 +18,11 @@ variable "app_private_key" {
   type        = string
 }
 
+variable "app_slug" {
+  description = "Github app slug (needed for data source)"
+  type        = string
+}
+
 variable "environment_directory" {
   description = "Environment directory"
   type        = string

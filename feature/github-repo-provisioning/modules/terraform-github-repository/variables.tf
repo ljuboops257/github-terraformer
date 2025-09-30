@@ -127,9 +127,9 @@ variable "merge_commit_title" {
 }
 
 variable "web_commit_signoff_required" {
-    description = "(Optional) Set to true to require commit signoff for all commits pushed to the repository. (Default: null)"
-    type        = bool
-    default     = null
+  description = "(Optional) Set to true to require commit signoff for all commits pushed to the repository. (Default: null)"
+  type        = bool
+  default     = null
 }
 
 variable "merge_commit_message" {
@@ -607,4 +607,54 @@ variable "module_depends_on" {
   type        = any
   description = "(Optional) Define resources this module indirectly depends_on."
   default     = []
+}
+
+variable "codeowners" {
+  description = "(Optional) A list of CODEOWNERS rules for the repository."
+  type = list(object({
+    path   = string
+    owners = list(string)
+  }))
+
+  # Example:
+  # codeowners = [
+  #   {
+  #     path   = "*"
+  #     owners = ["@org/team-leads", "@username"]
+  #   },
+  #   {
+  #     path   = "*.js"
+  #     owners = ["@org/frontend-team"]
+  #   },
+  #   {
+  #     path   = "/docs/"
+  #     owners = ["@org/docs-team", "@username"]
+  #   }
+  # ]
+
+  default = []
+}
+
+variable "codeowners_commit_author" {
+  description = "(Optional) The commit author for CODEOWNERS file. If not provided, uses the authenticated GitHub app name."
+  type        = string
+  default     = null
+}
+
+variable "codeowners_commit_email" {
+  description = "(Optional) The commit email for CODEOWNERS file. If not provided, uses the authenticated GitHub app email format."
+  type        = string
+  default     = null
+}
+
+variable "github_app_slug" {
+  description = "(Optional) The GitHub app slug for data source lookup. If not provided, uses the current authenticated app."
+  type        = string
+  default     = null
+}
+
+variable "auto_add_app_bypass" {
+  description = "(Optional) Automatically add the current GitHub app as a bypasser to branch protections and rulesets to ensure CODEOWNERS commits can be made."
+  type        = bool
+  default     = true
 }

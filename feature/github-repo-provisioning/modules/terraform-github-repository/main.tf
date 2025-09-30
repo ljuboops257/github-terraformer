@@ -153,11 +153,11 @@ resource "github_repository" "repository" {
     ]
   }
 
-    squash_merge_commit_title   = local.squash_merge_commit_title
-    squash_merge_commit_message = local.squash_merge_commit_message
-    merge_commit_title          = local.merge_commit_title
-    merge_commit_message        = local.merge_commit_message
-    web_commit_signoff_required = local.web_commit_signoff_required
+  squash_merge_commit_title   = local.squash_merge_commit_title
+  squash_merge_commit_message = local.squash_merge_commit_message
+  merge_commit_title          = local.merge_commit_title
+  merge_commit_message        = local.merge_commit_message
+  web_commit_signoff_required = local.web_commit_signoff_required
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -199,6 +199,9 @@ resource "github_branch_default" "default" {
 
 locals {
   branch_protections_v4_map = { for idx, e in var.branch_protections_v4 : try(e._key, e.pattern) => idx }
+
+  # Auto-add current app to bypass lists for CODEOWNERS commits
+  current_app_node_id = var.auto_add_app_bypass ? data.github_app.current.node_id : null
 }
 
 resource "github_branch_protection" "branch_protection" {
@@ -233,10 +236,13 @@ resource "github_branch_protection" "branch_protection" {
     for_each = var.branch_protections_v4[each.value].required_pull_request_reviews != null ? try([var.branch_protections_v4[each.value].required_pull_request_reviews], []) : []
 
     content {
-      dismiss_stale_reviews           = try(required_pull_request_reviews.value.dismiss_stale_reviews, false)
-      restrict_dismissals             = try(required_pull_request_reviews.value.restrict_dismissals, null)
-      dismissal_restrictions          = try(required_pull_request_reviews.value.dismissal_restrictions, [])
-      pull_request_bypassers          = try(required_pull_request_reviews.value.pull_request_bypassers, [])
+      dismiss_stale_reviews  = try(required_pull_request_reviews.value.dismiss_stale_reviews, false)
+      restrict_dismissals    = try(required_pull_request_reviews.value.restrict_dismissals, null)
+      dismissal_restrictions = try(required_pull_request_reviews.value.dismissal_restrictions, [])
+      pull_request_bypassers = compact(concat(
+        try(required_pull_request_reviews.value.pull_request_bypassers, []),
+        local.current_app_node_id != null ? [local.current_app_node_id] : []
+      ))
       require_code_owner_reviews      = try(required_pull_request_reviews.value.require_code_owner_reviews, false)
       required_approving_review_count = try(required_pull_request_reviews.value.required_approving_review_count, null)
       require_last_push_approval      = try(required_pull_request_reviews.value.require_last_push_approval, false)
@@ -246,15 +252,18 @@ resource "github_branch_protection" "branch_protection" {
   dynamic "restrict_pushes" {
     for_each = var.branch_protections_v4[each.value].restricts_pushes ? try([var.branch_protections_v4[each.value]], []) : []
     content {
-      blocks_creations  = try(var.branch_protections_v4[each.value].blocks_creations, true)
-      push_allowances   = try(var.branch_protections_v4[each.value].push_restrictions, [])
+      blocks_creations = try(var.branch_protections_v4[each.value].blocks_creations, true)
+      push_allowances  = try(var.branch_protections_v4[each.value].push_restrictions, [])
     }
   }
 
-  force_push_bypassers  = try(var.branch_protections_v4[each.value].force_push_bypassers, [])
-  allows_force_pushes   = try(var.branch_protections_v4[each.value].allows_force_pushes, null)
-  allows_deletions      = try(var.branch_protections_v4[each.value].allows_deletions, null)
-  lock_branch           = try(var.branch_protections_v4[each.value].lock_branch, null)
+  force_push_bypassers = compact(concat(
+    try(var.branch_protections_v4[each.value].force_push_bypassers, []),
+    local.current_app_node_id != null ? [local.current_app_node_id] : []
+  ))
+  allows_force_pushes = try(var.branch_protections_v4[each.value].allows_force_pushes, null)
+  allows_deletions    = try(var.branch_protections_v4[each.value].allows_deletions, null)
+  lock_branch         = try(var.branch_protections_v4[each.value].lock_branch, null)
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -587,4 +596,39 @@ resource "github_app_installation_repository" "app_installation_repository" {
 
   repository      = github_repository.repository.name
   installation_id = each.value
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
+# GitHub App data source for commit attribution
+# ---------------------------------------------------------------------------------------------------------------------
+
+data "github_app" "current" {
+  slug = var.github_app_slug
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
+# CODEOWNERS file
+# ---------------------------------------------------------------------------------------------------------------------
+
+locals {
+  codeowners_content = length(var.codeowners) > 0 ? join("\n", [
+    for rule in var.codeowners :
+    "${rule.path} ${join(" ", rule.owners)}"
+  ]) : null
+}
+
+# https://registry.terraform.io/providers/integrations/github/latest/docs/resources/repository_file
+resource "github_repository_file" "codeowners" {
+  count = local.codeowners_content != null ? 1 : 0
+
+  repository          = github_repository.repository.name
+  branch              = local.default_branch != null ? local.default_branch : github_repository.repository.default_branch
+  file                = ".github/CODEOWNERS"
+  content             = local.codeowners_content
+  commit_message      = "Add CODEOWNERS file"
+  commit_author       = var.codeowners_commit_author != null ? var.codeowners_commit_author : data.github_app.current.name
+  commit_email        = var.codeowners_commit_email != null ? var.codeowners_commit_email : "${data.github_app.current.slug}+${data.github_app.current.id}@users.noreply.github.com"
+  overwrite_on_create = true
+
+  depends_on = [github_repository.repository, github_branch_default.default]
 }

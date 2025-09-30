@@ -43,6 +43,7 @@ type Repository struct {
 	Rulesets                   []Ruleset             `yaml:"rulesets,omitempty"`
 	VulnerabilityAlertsEnabled *bool                 `yaml:"vulnerability_alerts_enabled,omitempty"`
 	BranchProtectionsV4        []*BranchProtectionV4 `yaml:"branch_protections_v4,omitempty"`
+	Codeowners                 []CodeownerRule       `yaml:"codeowners,omitempty"`
 }
 
 type RepositoryTemplate struct {
@@ -55,4 +56,9 @@ type Pages struct {
 	Branch    *string `yaml:"branch,omitempty"`
 	Path      *string `yaml:"path,omitempty"`
 	BuildType *string `yaml:"build_type,omitempty"`
+}
+
+type CodeownerRule struct {
+	Path   string   `yaml:"path"`
+	Owners []string `yaml:"owners"`
 }
